@@ -11,14 +11,9 @@ import java.util.HashMap;
 
 class SQLiteHandler extends SQLiteOpenHelper {
     private static final String TAG = SQLiteHandler.class.getSimpleName();
-
-    // Database Version
     private static final int DATABASE_VERSION = 0;
-
-    // Database Name
     private static final String DATABASE_NAME = "oceanic-settings";
 
-    // Prefs
     private static final String sTABLE_PREFS = "table_prefs";
     private static final String sPREF_KEY = "pref_key";
     private static final String sPREF_VALUE = "pref_value";
@@ -36,54 +31,54 @@ class SQLiteHandler extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-
-        //provide backward compatibility
         switch (oldVersion) {
             // for further versions
-            case 0: Log.i(TAG, "Initial OceanicSettings version.");
+            case 0:
+                break;
         }
     }
 
-    private long createPref(String prefKey, String prefValue) {
+    private void createPref(String prefKey, String prefValue, boolean isLogging) {
         ContentValues values = new ContentValues();
         values.put(sPREF_KEY, prefKey);
         values.put(sPREF_VALUE, prefValue);
 
         SQLiteDatabase db = this.getWritableDatabase();
-        long insertId = db.insert(sTABLE_PREFS, null, values);
-        close();
-        Log.i(TAG, "ID : " + insertId + "[ Added pref with key : " + prefKey + ", value : " + prefValue + " ]");
-        return insertId;
+        long id = db.insert(sTABLE_PREFS, null, values);
+        this.close();
+        if (isLogging)
+            Log.i(TAG, "new pref created: {" + id + "} (" + prefKey + ", " + prefValue + ")");
     }
 
-    long setPref(String prefKey, String prefValue) {
+    void setPref(String prefKey, String prefValue, boolean isLogging) {
         ContentValues values = new ContentValues();
         values.put(sPREF_VALUE, prefValue);
 
         SQLiteDatabase db = this.getWritableDatabase();
-        long valuesChanged = db.update(sTABLE_PREFS, values, sPREF_KEY + " = ?", new String[]{String.valueOf(prefKey)});
-        if (valuesChanged == 0) {
-            createPref(prefKey, prefValue);
+        long changes = db.update(sTABLE_PREFS, values, sPREF_KEY + " = ?", new String[]{String.valueOf(prefKey)});
+        if (changes == 0) {
+            createPref(prefKey, prefValue, isLogging);
+        } else {
+            Log.i(TAG, "pref set: {changes: " + changes + "(" + prefKey + ", " + prefValue + ")");
         }
         db.close();
-        Log.i(TAG, "Values Updated : " + valuesChanged + "[ Updated pref with key : " + prefKey + ", value : " + prefValue + " ]");
-        return valuesChanged;
     }
 
-    String getPref(String prefKey) {
+    String getPref(String prefKey, boolean isLogging) {
         String prefValue = null;
         String selectQuery = "SELECT  * FROM " + sTABLE_PREFS + " where " + sPREF_KEY + " = " + prefKey;
 
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(selectQuery, null);
-        // Move to first row
+
         if (cursor.getCount() > 0) {
             cursor.moveToFirst();
-            prefValue = cursor.getString(1);
+            prefValue = cursor.getString(cursor.getColumnIndex(sPREF_VALUE));
         }
         cursor.close();
         db.close();
-        Log.d(TAG, "Fetching pref : (" + prefKey + " , " + prefValue + ")");
+
+        Log.i(TAG, "getting pref: (" + prefKey + ", " + prefValue + ")");
         return prefValue;
     }
 
@@ -101,8 +96,8 @@ class SQLiteHandler extends SQLiteOpenHelper {
             String value;
 
             while (!cursor.isAfterLast()) {
-                key = cursor.getString(0);
-                value = cursor.getString(1);
+                key = cursor.getString(cursor.getColumnIndex(sPREF_KEY));
+                value = cursor.getString(cursor.getColumnIndex(sPREF_VALUE));
 
                 cursor.moveToNext();
                 hashMap.put(key, value);
